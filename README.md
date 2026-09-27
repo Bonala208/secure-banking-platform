@@ -109,50 +109,50 @@ cd secure-banking-platform
 
 ---
 
-### Step 2: Provision Cloud Infrastructure via Terraform
+### Step 2: Phase 1 — Provision ECR & Push Bootstrap Container Image
 
-1. Navigate to the terraform directory:
+AWS ECS Fargate tasks require a container image to be present in Amazon ECR upon service launch. To resolve this dependency smoothly:
+
+1. **Initialize Terraform & provision the ECR repository:**
    ```bash
    cd terraform
-   ```
-2. Initialize Terraform providers:
-   ```bash
    terraform init
+   terraform apply -target=aws_ecr_repository.app -auto-approve
    ```
-3. Preview the infrastructure plan:
+
+2. **Authenticate Docker to your AWS ECR registry:**
    ```bash
-   terraform plan
+   export AWS_REGION="ap-southeast-1"
+   export ECR_URL="$(terraform output -raw ecr_repository_url)"
+
+   aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_URL
    ```
-4. Deploy the infrastructure:
+
+3. **Build & push the initial container image** *(using `--platform linux/amd64` for Apple Silicon / multi-arch compatibility)*:
    ```bash
-   terraform apply -auto-approve
+   cd ../app
+   docker build --platform linux/amd64 -t $ECR_URL:latest .
+   docker push $ECR_URL:latest
    ```
-5. Note the outputs:
-   * `alb_dns_name`: Public URL of the banking application.
-   * `api_docs_swagger_url`: Swagger documentation link.
-   * `ecr_repository_url`: Docker registry URL.
 
 ---
 
-### Step 3: Build & Push Initial Container Image
+### Step 3: Phase 2 — Deploy Full Cloud Infrastructure (VPC, RDS, ALB & ECS)
 
-Log into your newly created AWS ECR repository and push the banking application image:
+Once the container image is in ECR, provision the full 3-tier infrastructure:
 
 ```bash
-# Set your AWS region and ECR URL from terraform output
-export AWS_REGION="ap-southeast-1"
-export ECR_URL="$(terraform output -raw ecr_repository_url)"
-
-# Authenticate Docker to ECR
-aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_URL
-
-# Build Docker image
-cd ../app
-docker build -t $ECR_URL:latest .
-
-# Push image to ECR
-docker push $ECR_URL:latest
+cd ../terraform
+terraform apply -auto-approve
 ```
+
+*(This takes ~5–7 minutes primarily for Amazon RDS PostgreSQL to provision across Multi-AZ before ECS tasks launch).*
+
+**Outputs upon completion:**
+* `alb_dns_name`: Public URL of the banking application.
+* `api_docs_swagger_url`: Interactive Swagger documentation link.
+* `ecr_repository_url`: Docker registry URL.
+* `rds_endpoint`: PostgreSQL private endpoint.
 
 ---
 
