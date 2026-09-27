@@ -1,0 +1,39 @@
+services:
+  # Local PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: local-banking-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: banking_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Banking API Application
+  api:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: local-banking-api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_USER: postgres
+      DB_PASSWORD: password
+      DB_NAME: banking_db
+      DB_PORT: 5432
+    ports:
+      - "8000:8000"
+
+volumes:
+  pgdata:
