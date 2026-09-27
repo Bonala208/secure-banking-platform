@@ -50,7 +50,7 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(
-    title="Core Banking REST API",
+    title="Core Banking REST API App",
     description="Secure, resilient REST API performing CRUD banking operations.",
     version="1.0.0",
     lifespan=lifespan
